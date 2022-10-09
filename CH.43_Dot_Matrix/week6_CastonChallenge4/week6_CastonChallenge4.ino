@@ -107,6 +107,7 @@ byte patterns[Patterns_no][8][8]  // Pattern
   = { I, N, D, U, K, M, LOVE };
 
 
+
 void setup() {
   for (int i = 1; i <= 16; i++) {
     pinMode(pin[i], OUTPUT);
