@@ -15,9 +15,20 @@ void setup() {
 void loop() {
   // put your main code here, to runiuj8i repeatedly:
   // row : high, col : low 일때 led On!
-  digitalWrite(row[7], HIGH);
-
-  for (int i = 1; i < 8; i++) {
-    digitalWrite(col[i], LOW);
+  for (int i = 7; i >= 0; i--) {
+    for (int k = 7; k >= 0; k--) {
+      dot_led(i, k);
+      delay(500);
+    }
   }
+}
+
+void dot_led(int row_led, int col_led) {
+  for (int m = 0; m < 8; m++) {
+    digitalWrite(row[m], LOW);
+    digitalWrite(col[m], HIGH);
+  }
+
+  digitalWrite(row[row_led], HIGH);
+  digitalWrite(col[col_led], LOW);
 }
