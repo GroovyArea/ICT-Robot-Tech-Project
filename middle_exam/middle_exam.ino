@@ -24,6 +24,13 @@ void loop() {
   // put your main code here, to run repeatedly:
 }
 
+void initDisplay() {
+  for (int i = 0; i < 8; i++) {
+    digitalWrite(row[i], LOW);
+    digitalWrite(col[i], HIGH);
+  }
+}
+
 void fallingAct() {
   if (isChanged) {
     for (int i = 0; i < 8; i++) {
@@ -33,10 +40,7 @@ void fallingAct() {
     }
 
   } else {
-    for (int i = 0; i < 8; i++) {
-      digitalWrite(row[i], LOW);
-      digitalWrite(col[i], HIGH);
-    }
+    initDisplay();
   }
 
   isChanged = !isChanged;
