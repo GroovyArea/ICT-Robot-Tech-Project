@@ -14,27 +14,32 @@
 #define SS_PIN 5  //RFID 핀
 #define RST_PIN 4
 
+#define c_4 261  // 계이름 도 주파수
+#define e_4 329
+#define g_4 392
+
+
 /**
   엘리베이터 층 enum 
 */
-typedef enum ElevatorState {
-  FIRST = 1,
+enum class eFloor {
+  FIRST,
   SECOND,
   THIRD
-} FLOOR;
+};
 
 /**
   현재 층
 */
-FLOOR presentFloor = FIRST;
+eFloor presentFloor = eFloor::FIRST;
 
 /**
   엘리베이터 관련 상수
 */
 const int EMERGENCY_BUTTON = 2;      //비상정지 스위치 인터럽트 2번핀
-const int FIRST_FLOOR_BUTTON = 14;   //1층 스위치
-const int SECOND_FLOOR_BUTTON = 15;  //2층 스위치
-const int THIRD_FLOOR_BUTTON = 16;   //3층 스위치
+const int FIRST_FLOOR_BUTTON = 19;   //1층 스위치
+const int SECOND_FLOOR_BUTTON = 20;  //2층 스위치
+const int THIRD_FLOOR_BUTTON = 21;   //3층 스위치
 
 /**
   버저 상수
@@ -68,7 +73,7 @@ int segmentNumbers[10][7] = {
 /**
   RFID 관련
 */
-byte nuidPICC[4];
+byte nuidPICC[4];                             //카드 ID를 비교하기 위한 배열
 byte managerCard[4] = { 115, 202, 136, 12 };  //관리자 카드 ID
 byte residentCard[4] = { 19, 241, 90, 2 };    //입주민 카드 ID
 
@@ -82,6 +87,14 @@ MFRC522 mfrc522(SS_PIN, RST_PIN);  // RFID 객체
 */
 LiquidCrystal_I2C lcd(0x27, 16, 2);  //LCD 핀
 
+/**
+  Step motor 관련 변수
+*/
+bool direction = true;
+int steps = 0;
+unsigned long lastTime;
+unsigned long currentMillis;
+long time;
 
 void setup() {
   for (int i = 0; i < 7; i++) {
@@ -97,37 +110,200 @@ void setup() {
 
   pinMode(BUZZER, OUTPUT);
 
-  noInterrupts();
-  interrupts();
-  attachInterrupt(digitalPinToInterrupt(EMERGENCY_BUTTON), emergencyAct, FALLING);
-
   Serial.begin(9600);
 
-  lcd.init();                      // LCD 초기화
-  lcd.backlight();                // 백라이트 켜기
+  lcd.init();       // LCD 초기화
+  lcd.backlight();  // 백라이트 켜기
 
   SPI.begin();
   mfrc522.PCD_Init();
   ShowReaderDetails();
   Serial.println("Scan PICC to see UID, type, and data blocks...");
+
+  // 인터럽트
+  noInterrupts();
+  interrupts();
+  attachInterrupt(digitalPinToInterrupt(EMERGENCY_BUTTON), emergencyBtnPush, FALLING);
+  attachInterrupt(digitalPinToInterrupt(SECOND_FLOOR_BUTTON), middleFloorPush, FALLING);
 }
 
 void loop() {
   if (!mfrc522.PICC_IsNewCardPresent()) return;
   if (!mfrc522.PICC_ReadCardSerial()) return;
-  
   mfrc522.PICC_DumpToSerial(&(mfrc522.uid));
 
-  String content = "";
-
-  for (byte i = 0; i < mfrc522.uid.size; i++) {
-    content.concat(String(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " "));
-    content.concat(String(mfrc522.uid.uidByte[i], HEX));
+  // 새 카드 접촉 시
+  if (mfrc522.uid.uidByte[0] != nuidPICC[0] || mfrc522.uid.uidByte[1] != nuidPICC[1] || mfrc522.uid.uidByte[2] != nuidPICC[2] || mfrc522.uid.uidByte[3] != nuidPICC[3]) {
+    for (byte i = 0; i < 4; i++) {
+      nuidPICC[i] = mfrc522.uid.uidByte[i];  // 배열에 카드 번호 저장
+    }
   }
 
-  content.toUpperCase();
+  int firstBtn = digitalRead(FIRST_FLOOR_BUTTON);
+  int secondBtn = digitalRead(SECOND_FLOOR_BUTTON);
+  int thirdBtn = digitalRead(THIRD_FLOOR_BUTTON);
+
+  /* 1층 눌럿을 경우 */
+  if (firstBtn == HIGH) {
+    if (presentFloor == eFloor::SECOND) {
+      // 4바퀴 아래로 감기
+      // LCD에 화살표 아래로 계속
+      // 도착 시 피에조 알림음 & 엘베 층 상태 변수 초기화 & LCD 초기화
+      downPointerShift();
+      reverseRotate(4);
+      arrivedMusicPlay();
+    } else if (presentFloor == eFloor::THIRD) {
+      // 8바퀴 아래로 감기
+      // LCD 화살표 아래 계속
+      // 도착 시 피에조 알림음 & 엘베 층 상태 변수 초기화
+      downPointerShift();
+      reverseRotate(8);
+      arrivedMusicPlay();
+    }
+
+    lcd.init();
+    presentFloor = eFloor::FIRST;
+  }
+
+  /* 2층 눌럿을 경우 */
+  if (secondBtn == HIGH) {
+    if (presentFloor == eFloor::FIRST) {
+      // 4바퀴 올라가기
+      // LCD에 위로 계속
+      // 도착 시 피에조 알림음 & 엘베 층 상태 변수 초기화
+      upPointerShift();
+      forwardRotate(4);
+      arrivedMusicPlay();
+    } else if (presentFloor == eFloor::THIRD) {
+      // 4바퀴 내려가기
+      // LCD에 아래로 계속
+      // 도착 시 피에조 알림음 & 엘베 층 상태 변수 초기화
+      downPointerShift();
+      reverseRotate(4);
+      arrivedMusicPlay();
+    }
+
+    lcd.init();
+    presentFloor = eFloor::SECOND;
+  }
+
+  /* 3층 눌럿을 경우 */
+  if (thirdBtn == HIGH) {
+    if (presentFloor == eFloor::FIRST) {
+      // 8바퀴 내려가기
+      // LCD에 아래로 계속
+      // 도착 시 피에조 알림음 & 엘베 층 상태 변수 초기화
+      downPointerShift();
+      reverseRotate(8);
+      arrivedMusicPlay();
+    } else if (presentFloor == eFloor::SECOND) {
+      // 4바퀴 내려가기
+      // LCD에 아래로 계속
+      // 도착 시 피에조 알림음 & 엘베 층 상태 변수 초기화
+      downPointerShift();
+      reverseRotate(4);
+      arrivedMusicPlay();
+    }
+
+    lcd.init();
+    presentFloor = eFloor::THIRD;
+  }
+}
+
+// 엘베 도착음
+void arrivedMusicPlay() {
+  tone(BUZZER, c_4, 300);
+  tone(BUZZER, e_4, 300);
+  tone(BUZZER, g_4, 300);
+  notone(BUZZER);
+}
+
+// 위로 향하는 화살표 lcd
+void upPointerShift() {
 
 }
+
+// 아래로 향하는 화살표 lcd
+void downPointerShift() {
+
+}
+
+void forwardRotate(int rotateCount) {
+  direction = true;
+
+  int totalRotateCount = 4095 * rotateCount;
+
+  while (totalRotateCount > 0) {
+    currentMillis = micros();
+
+    if (currentMillis - lastTime >= 1000) {
+      stepperAct();
+
+      time = time + micros() - lastTime;
+      lastTime = micros();
+
+      totalRotateCount--;
+    }
+  }
+}
+
+void reverseRotate(int rotateCount) {
+  direction = false;
+
+  int totalRotateCount = 4095 * rotateCount;
+
+  while (totalRotateCount > 0) {
+    currentMillis = micros();
+
+    if (currentMillis - lastTime >= 1000) {
+      stepperAct();
+
+      time = time + micros() - lastTime;
+      lastTime = micros();
+
+      totalRotateCount--;
+    }
+  }
+}
+
+void stepperAct() {
+  switch (steps) {
+    case 0: runStep(LOW, LOW, LOW, HIGH); break;
+    case 1: runStep(LOW, LOW, HIGH, HIGH); break;
+    case 2: runStep(LOW, LOW, HIGH, LOW); break;
+    case 3: runStep(LOW, HIGH, HIGH, LOW); break;
+    case 4: runStep(LOW, HIGH, LOW, LOW); break;
+    case 5: runStep(HIGH, HIGH, LOW, LOW); break;
+    case 6: runStep(HIGH, LOW, LOW, LOW); break;
+    case 7: runStep(LOW, LOW, LOW, HIGH); break;
+    default: runStep(LOW, LOW, LOW, LOW); break;
+  }
+  setDirection();
+}
+
+void runStep(int step1, int step2, int step3, int step4) {
+  digitalWrite(IN1, step1);
+  digitalWrite(IN2, step2);
+  digitalWrite(IN3, step3);
+  digitalWrite(IN4, step4);
+}
+
+void setDirection() {
+  if (direction == true) {
+    steps++;
+  }
+  if (direction == false) {
+    steps--;
+  }
+  if (steps > 7) {
+    steps = 0;
+  }
+  if (steps < 0) {
+    steps = 7;
+  }
+}
+
+
 
 void ShowReaderDetails() {
   byte v = mfrc522.PCD_ReadRegister(mfrc522.VersionReg);
@@ -148,8 +324,23 @@ void ShowReaderDetails() {
   }
 }
 
+
+
 /**
   비상정지 인터럽트 시 행동
 */
-void emergencyAct() {
+void emergencyBtnPush() {
+  // 경비실로 연결, 시리얼 모니터로 계속 받고 LCD에 내용 디스플레이
+  // 비상정지 버튼이나, 특정 문자 입력 시 종료
+}
+
+/**
+  엘베 가동 중 2층 인터럽트 행동
+*/
+void middleFloorPush() {
+  // 1층 -> 3층
+  // => 중간에 2층에서 멈춰야 되고 다시 3층 가야됨. 어케 할가
+
+  // 3층 -> 1층
+  // => 증간에 2층 멈추고 1층 내려감. 근데 멈추는 걸 어케 표현함? 잠시 정지?
 }
