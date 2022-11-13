@@ -123,21 +123,31 @@ void setup() {
   // 인터럽트
   noInterrupts();
   interrupts();
-  attachInterrupt(digitalPinToInterrupt(EMERGENCY_BUTTON), emergencyBtnPush, FALLING);
-  attachInterrupt(digitalPinToInterrupt(SECOND_FLOOR_BUTTON), middleFloorPush, FALLING);
+  attachInterrupt(digitalPinToInterrupt(EMERGENCY_BUTTON), emergencyCommunicate, FALLING);
+  attachInterrupt(digitalPinToInterrupt(SECOND_FLOOR_BUTTON), middleFloorStop, FALLING);
 }
 
 void loop() {
   if (!mfrc522.PICC_IsNewCardPresent()) return;
   if (!mfrc522.PICC_ReadCardSerial()) return;
   mfrc522.PICC_DumpToSerial(&(mfrc522.uid));
-
+  
+  String tagedCard = "";
+  
   // 새 카드 접촉 시
   if (mfrc522.uid.uidByte[0] != nuidPICC[0] || mfrc522.uid.uidByte[1] != nuidPICC[1] || mfrc522.uid.uidByte[2] != nuidPICC[2] || mfrc522.uid.uidByte[3] != nuidPICC[3]) {
     for (byte i = 0; i < 4; i++) {
       nuidPICC[i] = mfrc522.uid.uidByte[i];  // 배열에 카드 번호 저장
     }
+  
+    for( byte i =0; i<mfrc522.uid.size; i++) {
+      tagedCard.concat(String(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " "));
+      tagedCard.concat(String(mfrc522.uid.uidByte[i], DEC));
+    }
+
   }
+
+
 
   int firstBtn = digitalRead(FIRST_FLOOR_BUTTON);
   int secondBtn = digitalRead(SECOND_FLOOR_BUTTON);
@@ -163,6 +173,7 @@ void loop() {
 
     lcd.init();
     presentFloor = eFloor::FIRST;
+    presentFloorDigitDisplay();
   }
 
   /* 2층 눌럿을 경우 */
@@ -185,6 +196,7 @@ void loop() {
 
     lcd.init();
     presentFloor = eFloor::SECOND;
+    presentFloorDigitDisplay();
   }
 
   /* 3층 눌럿을 경우 */
@@ -207,26 +219,50 @@ void loop() {
 
     lcd.init();
     presentFloor = eFloor::THIRD;
+    presentFloorDigitDisplay();
   }
 }
+
+
+
+// 층별 Segment display
+void presentFloorDigitDisplay() {
+  if (presentFloor == eFloor::FIRST) {
+    for (int i = 0; i < 7; i++) {
+      digitalWrite(firstFloor[i], segmentNumbers[1][i]);
+    }
+  } else if (presentFloor == eFloor::SECOND) {
+    for (int i = 0; i < 7; i++) {
+      digitalWrite(secondFloor[i], segmentNumbers[2][i]);
+    }
+  } else {
+    for (int i = 0; i < 7; i++) {
+      digitalWrite(thirdFloor[i], segmentNumbers[3][i]);
+    }
+  }
+}
+
+
 
 // 엘베 도착음
 void arrivedMusicPlay() {
   tone(BUZZER, c_4, 300);
   tone(BUZZER, e_4, 300);
   tone(BUZZER, g_4, 300);
-  notone(BUZZER);
+  noTone(BUZZER);
 }
+
+
 
 // 위로 향하는 화살표 lcd
 void upPointerShift() {
-
 }
 
 // 아래로 향하는 화살표 lcd
 void downPointerShift() {
-
 }
+
+
 
 void forwardRotate(int rotateCount) {
   direction = true;
@@ -329,15 +365,15 @@ void ShowReaderDetails() {
 /**
   비상정지 인터럽트 시 행동
 */
-void emergencyBtnPush() {
+void emergencyCommunicate() {
   // 경비실로 연결, 시리얼 모니터로 계속 받고 LCD에 내용 디스플레이
   // 비상정지 버튼이나, 특정 문자 입력 시 종료
 }
 
 /**
-  엘베 가동 중 2층 인터럽트 행동
+  엘베 가동 중 2층 인터럽트 시 행동
 */
-void middleFloorPush() {
+void middleFloorStop() {
   // 1층 -> 3층
   // => 중간에 2층에서 멈춰야 되고 다시 3층 가야됨. 어케 할가
 
