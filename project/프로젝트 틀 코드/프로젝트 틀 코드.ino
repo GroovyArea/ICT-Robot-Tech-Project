@@ -36,10 +36,13 @@ eFloor presentFloor = eFloor::FIRST;
 /**
   엘리베이터 관련 상수
 */
-const int EMERGENCY_BUTTON = 2;      //비상정지 스위치 인터럽트 2번핀
+//const int EMERGENCY_BUTTON = 2;      //비상정지 스위치 인터럽트 2번핀
 const int FIRST_FLOOR_BUTTON = 19;   //1층 스위치
-const int SECOND_FLOOR_BUTTON = 20;  //2층 스위치
-const int THIRD_FLOOR_BUTTON = 21;   //3층 스위치
+const int SECOND_FLOOR_BUTTON = 3;  //2층 스위치
+const int THIRD_FLOOR_BUTTON = 2;   //3층 스위치
+
+const int ONE_FLOOR = 5;
+const int TWO_FLOOR = 10;
 
 /**
   버저 상수
@@ -108,6 +111,10 @@ void setup() {
   pinMode(IN3, OUTPUT);
   pinMode(IN4, OUTPUT);
 
+  pinMode(FIRST_FLOOR_BUTTON, INPUT);
+  pinMode(SECOND_FLOOR_BUTTON, INPUT);
+  pinMode(THIRD_FLOOR_BUTTON, INPUT);
+
   pinMode(BUZZER, OUTPUT);
 
   Serial.begin(9600);
@@ -123,29 +130,28 @@ void setup() {
   // 인터럽트
   noInterrupts();
   interrupts();
-  attachInterrupt(digitalPinToInterrupt(EMERGENCY_BUTTON), emergencyCommunicate, FALLING);
+  //attachInterrupt(digitalPinToInterrupt(EMERGENCY_BUTTON), emergencyCommunicate, FALLING);
   attachInterrupt(digitalPinToInterrupt(SECOND_FLOOR_BUTTON), middleFloorStop, FALLING);
 }
 
 void loop() {
-  if (!mfrc522.PICC_IsNewCardPresent()) return;
-  if (!mfrc522.PICC_ReadCardSerial()) return;
-  mfrc522.PICC_DumpToSerial(&(mfrc522.uid));
+  // if (!mfrc522.PICC_IsNewCardPresent()) return;
+  // if (!mfrc522.PICC_ReadCardSerial()) return;
+  // mfrc522.PICC_DumpToSerial(&(mfrc522.uid));
   
-  String tagedCard = "";
+  // String tagedCard = "";
   
-  // 새 카드 접촉 시
-  if (mfrc522.uid.uidByte[0] != nuidPICC[0] || mfrc522.uid.uidByte[1] != nuidPICC[1] || mfrc522.uid.uidByte[2] != nuidPICC[2] || mfrc522.uid.uidByte[3] != nuidPICC[3]) {
-    for (byte i = 0; i < 4; i++) {
-      nuidPICC[i] = mfrc522.uid.uidByte[i];  // 배열에 카드 번호 저장
-    }
+  // // 새 카드 접촉 시
+  // if (mfrc522.uid.uidByte[0] != nuidPICC[0] || mfrc522.uid.uidByte[1] != nuidPICC[1] || mfrc522.uid.uidByte[2] != nuidPICC[2] || mfrc522.uid.uidByte[3] != nuidPICC[3]) {
+  //   for (byte i = 0; i < 4; i++) {
+  //     nuidPICC[i] = mfrc522.uid.uidByte[i];  // 배열에 카드 번호 저장
+  //   }
   
-    for( byte i =0; i<mfrc522.uid.size; i++) {
-      tagedCard.concat(String(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " "));
-      tagedCard.concat(String(mfrc522.uid.uidByte[i], DEC));
-    }
-
-  }
+  //   for( byte i =0; i<mfrc522.uid.size; i++) {
+  //     tagedCard.concat(String(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " "));
+  //     tagedCard.concat(String(mfrc522.uid.uidByte[i], DEC));
+  //   }
+  // }
 
 
 
@@ -160,14 +166,14 @@ void loop() {
       // LCD에 화살표 아래로 계속
       // 도착 시 피에조 알림음 & 엘베 층 상태 변수 초기화 & LCD 초기화
       downPointerShift();
-      reverseRotate(4);
+      reverseRotate(ONE_FLOOR);
       arrivedMusicPlay();
     } else if (presentFloor == eFloor::THIRD) {
       // 8바퀴 아래로 감기
       // LCD 화살표 아래 계속
       // 도착 시 피에조 알림음 & 엘베 층 상태 변수 초기화
       downPointerShift();
-      reverseRotate(8);
+      reverseRotate(TWO_FLOOR);
       arrivedMusicPlay();
     }
 
@@ -178,19 +184,20 @@ void loop() {
 
   /* 2층 눌럿을 경우 */
   if (secondBtn == HIGH) {
+    Serial.println("2층");
     if (presentFloor == eFloor::FIRST) {
       // 4바퀴 올라가기
       // LCD에 위로 계속
       // 도착 시 피에조 알림음 & 엘베 층 상태 변수 초기화
       upPointerShift();
-      forwardRotate(4);
+      forwardRotate(ONE_FLOOR);
       arrivedMusicPlay();
     } else if (presentFloor == eFloor::THIRD) {
       // 4바퀴 내려가기
       // LCD에 아래로 계속
       // 도착 시 피에조 알림음 & 엘베 층 상태 변수 초기화
       downPointerShift();
-      reverseRotate(4);
+      reverseRotate(ONE_FLOOR);
       arrivedMusicPlay();
     }
 
@@ -205,15 +212,15 @@ void loop() {
       // 8바퀴 내려가기
       // LCD에 아래로 계속
       // 도착 시 피에조 알림음 & 엘베 층 상태 변수 초기화
-      downPointerShift();
-      reverseRotate(8);
+      upPointerShift();
+      forwardRotate(TWO_FLOOR);
       arrivedMusicPlay();
     } else if (presentFloor == eFloor::SECOND) {
       // 4바퀴 내려가기
       // LCD에 아래로 계속
       // 도착 시 피에조 알림음 & 엘베 층 상태 변수 초기화
-      downPointerShift();
-      reverseRotate(4);
+      upPointerShift();
+      forwardRotate(ONE_FLOOR);
       arrivedMusicPlay();
     }
 
