@@ -36,10 +36,10 @@ eFloor presentFloor = eFloor::FIRST;
 /**
   엘리베이터 관련 상수
 */
-//const int EMERGENCY_BUTTON = 2;      //비상정지 스위치 인터럽트 2번핀
-const int FIRST_FLOOR_BUTTON = 19;   //1층 스위치
+const int EMERGENCY_BUTTON = 2;     //비상정지 스위치 인터럽트 2번핀
+const int FIRST_FLOOR_BUTTON = 18;  //1층 스위치
 const int SECOND_FLOOR_BUTTON = 3;  //2층 스위치
-const int THIRD_FLOOR_BUTTON = 2;   //3층 스위치
+const int THIRD_FLOOR_BUTTON = 19;  //3층 스위치
 
 const int ONE_FLOOR = 5;
 const int TWO_FLOOR = 10;
@@ -99,6 +99,8 @@ unsigned long lastTime;
 unsigned long currentMillis;
 long time;
 
+int presentRotateCount = 0;  // 현재까지 스텝 돈 수
+
 void setup() {
   for (int i = 0; i < 7; i++) {
     pinMode(firstFloor[i], OUTPUT);
@@ -130,109 +132,97 @@ void setup() {
   // 인터럽트
   noInterrupts();
   interrupts();
-  //attachInterrupt(digitalPinToInterrupt(EMERGENCY_BUTTON), emergencyCommunicate, FALLING);
+  attachInterrupt(digitalPinToInterrupt(EMERGENCY_BUTTON), emergencyCommunicate, FALLING);
+  //attachInterrupt(digitalPinToInterrupt(FIRST_FLOOR_BUTTON), bottonFloorStop, FALLING);
   attachInterrupt(digitalPinToInterrupt(SECOND_FLOOR_BUTTON), middleFloorStop, FALLING);
+  //attachInterrupt(digitalPinToInterrupt(THIRD_FLOOR_BUTTON), topFloorStop, FALLING);
 }
 
 void loop() {
   // if (!mfrc522.PICC_IsNewCardPresent()) return;
   // if (!mfrc522.PICC_ReadCardSerial()) return;
   // mfrc522.PICC_DumpToSerial(&(mfrc522.uid));
-  
+
   // String tagedCard = "";
-  
+
   // // 새 카드 접촉 시
   // if (mfrc522.uid.uidByte[0] != nuidPICC[0] || mfrc522.uid.uidByte[1] != nuidPICC[1] || mfrc522.uid.uidByte[2] != nuidPICC[2] || mfrc522.uid.uidByte[3] != nuidPICC[3]) {
   //   for (byte i = 0; i < 4; i++) {
   //     nuidPICC[i] = mfrc522.uid.uidByte[i];  // 배열에 카드 번호 저장
   //   }
-  
+
   //   for( byte i =0; i<mfrc522.uid.size; i++) {
   //     tagedCard.concat(String(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " "));
   //     tagedCard.concat(String(mfrc522.uid.uidByte[i], DEC));
   //   }
   // }
 
-
-
   int firstBtn = digitalRead(FIRST_FLOOR_BUTTON);
-  int secondBtn = digitalRead(SECOND_FLOOR_BUTTON);
+  //int secondBtn = digitalRead(SECOND_FLOOR_BUTTON);
   int thirdBtn = digitalRead(THIRD_FLOOR_BUTTON);
 
   /* 1층 눌럿을 경우 */
   if (firstBtn == HIGH) {
+    presentFloorDigitOff();
     if (presentFloor == eFloor::SECOND) {
-      // 4바퀴 아래로 감기
-      // LCD에 화살표 아래로 계속
-      // 도착 시 피에조 알림음 & 엘베 층 상태 변수 초기화 & LCD 초기화
       downPointerShift();
-      reverseRotate(ONE_FLOOR);
+      reverseRotate();
       arrivedMusicPlay();
     } else if (presentFloor == eFloor::THIRD) {
-      // 8바퀴 아래로 감기
-      // LCD 화살표 아래 계속
-      // 도착 시 피에조 알림음 & 엘베 층 상태 변수 초기화
       downPointerShift();
-      reverseRotate(TWO_FLOOR);
+      reverseRotate();
+      presentRotateCount = 0;
+      reverseRotate();
       arrivedMusicPlay();
     }
 
-    lcd.init();
     presentFloor = eFloor::FIRST;
     presentFloorDigitDisplay();
+    presentRotateCount = 0;
   }
 
   /* 2층 눌럿을 경우 */
-  if (secondBtn == HIGH) {
-    Serial.println("2층");
-    if (presentFloor == eFloor::FIRST) {
-      // 4바퀴 올라가기
-      // LCD에 위로 계속
-      // 도착 시 피에조 알림음 & 엘베 층 상태 변수 초기화
-      upPointerShift();
-      forwardRotate(ONE_FLOOR);
-      arrivedMusicPlay();
-    } else if (presentFloor == eFloor::THIRD) {
-      // 4바퀴 내려가기
-      // LCD에 아래로 계속
-      // 도착 시 피에조 알림음 & 엘베 층 상태 변수 초기화
-      downPointerShift();
-      reverseRotate(ONE_FLOOR);
-      arrivedMusicPlay();
-    }
+  // if (secondBtn == HIGH) {
+  //   Serial.println("2층");
+  //   if (presentFloor == eFloor::FIRST) {
+  //     upPointerShift();
+  //     forwardRotate();
+  //     arrivedMusicPlay();
+  //   } else if (presentFloor == eFloor::THIRD) {
+  //     downPointerShift();
+  //     reverseRotate();
+  //     arrivedMusicPlay();
+  //   }
 
-    lcd.init();
-    presentFloor = eFloor::SECOND;
-    presentFloorDigitDisplay();
-  }
+  //   lcd.init();
+  //   presentFloor = eFloor::SECOND;
+  //   presentFloorDigitDisplay();
+  // }
 
   /* 3층 눌럿을 경우 */
   if (thirdBtn == HIGH) {
+    presentFloorDigitOff();
     if (presentFloor == eFloor::FIRST) {
-      // 8바퀴 내려가기
-      // LCD에 아래로 계속
-      // 도착 시 피에조 알림음 & 엘베 층 상태 변수 초기화
       upPointerShift();
-      forwardRotate(TWO_FLOOR);
+      forwardRotate();
+      presentRotateCount = 0;
+      forwardRotate();
       arrivedMusicPlay();
     } else if (presentFloor == eFloor::SECOND) {
-      // 4바퀴 내려가기
-      // LCD에 아래로 계속
-      // 도착 시 피에조 알림음 & 엘베 층 상태 변수 초기화
       upPointerShift();
-      forwardRotate(ONE_FLOOR);
+      forwardRotate();
       arrivedMusicPlay();
     }
 
-    lcd.init();
     presentFloor = eFloor::THIRD;
     presentFloorDigitDisplay();
+    presentRotateCount = 0;
   }
 }
 
 
 
-// 층별 Segment display
+// 층별 Segment display on
 void presentFloorDigitDisplay() {
   if (presentFloor == eFloor::FIRST) {
     for (int i = 0; i < 7; i++) {
@@ -249,13 +239,31 @@ void presentFloorDigitDisplay() {
   }
 }
 
+// 층별 Segment display off
+void presentFloorDigitOff() {
+  if (presentFloor == eFloor::FIRST) {
+    for (int i = 0; i < 7; i++) {
+      digitalWrite(firstFloor[i], LOW);
+    }
+  } else if (presentFloor == eFloor::SECOND) {
+    for (int i = 0; i < 7; i++) {
+      digitalWrite(secondFloor[i], LOW);
+    }
+  } else {
+    for (int i = 0; i < 7; i++) {
+      digitalWrite(thirdFloor[i], LOW);
+    }
+  }
+}
 
 
 // 엘베 도착음
 void arrivedMusicPlay() {
-  tone(BUZZER, c_4, 300);
-  tone(BUZZER, e_4, 300);
-  tone(BUZZER, g_4, 300);
+  tone(BUZZER, c_4);
+  delay_(200);
+  tone(BUZZER, e_4);
+  delay_(200);
+  tone(BUZZER, g_4);
   noTone(BUZZER);
 }
 
@@ -271,10 +279,10 @@ void downPointerShift() {
 
 
 
-void forwardRotate(int rotateCount) {
+void forwardRotate() {
   direction = true;
 
-  int totalRotateCount = 4095 * rotateCount;
+  int totalRotateCount = 4095 * 1;
 
   while (totalRotateCount > 0) {
     currentMillis = micros();
@@ -286,14 +294,19 @@ void forwardRotate(int rotateCount) {
       lastTime = micros();
 
       totalRotateCount--;
+      presentRotateCount++;
+
+      if (presentRotateCount == 4095) {
+        break;
+      }
     }
   }
 }
 
-void reverseRotate(int rotateCount) {
+void reverseRotate() {
   direction = false;
 
-  int totalRotateCount = 4095 * rotateCount;
+  int totalRotateCount = 4095 * 1;
 
   while (totalRotateCount > 0) {
     currentMillis = micros();
@@ -305,6 +318,11 @@ void reverseRotate(int rotateCount) {
       lastTime = micros();
 
       totalRotateCount--;
+      presentRotateCount++;
+
+      if (presentRotateCount == 4095) {
+        break;
+      }
     }
   }
 }
@@ -367,7 +385,15 @@ void ShowReaderDetails() {
   }
 }
 
+void delay_(int ms) {
+  int count = 0;
 
+  while (count != ms) {
+    delayMicroseconds(1000);
+    count++;
+  }
+  count = 0;
+}
 
 /**
   비상정지 인터럽트 시 행동
@@ -378,12 +404,76 @@ void emergencyCommunicate() {
 }
 
 /**
-  엘베 가동 중 2층 인터럽트 시 행동
+  1층 눌렀을 때
+*/
+// void bottonFloorStop() {
+//   presentFloorDigitOff();
+
+//   if (presentFloor == eFloor::SECOND) {
+//     downPointerShift();
+//     reverseRotate();
+//     arrivedMusicPlay();
+//   } else if (presentFloor == eFloor::THIRD) {
+//     downPointerShift();
+//     reverseRotate();
+//     reverseRotate();
+//     arrivedMusicPlay();
+//   }
+
+//   presentFloor = eFloor::FIRST;
+//   presentFloorDigitDisplay();
+// }
+
+/**
+  2층 눌렀을 때
 */
 void middleFloorStop() {
-  // 1층 -> 3층
-  // => 중간에 2층에서 멈춰야 되고 다시 3층 가야됨. 어케 할가
+  // 인터럽트 말고 그냥 2층 눌럿을 때
+  if (presentRotateCount == 0) {
+    Serial.print("들어오지마");
 
-  // 3층 -> 1층
-  // => 증간에 2층 멈추고 1층 내려감. 근데 멈추는 걸 어케 표현함? 잠시 정지?
+    if (presentFloor == eFloor::FIRST) {
+      upPointerShift();
+      forwardRotate();
+      arrivedMusicPlay();
+    } else if (presentFloor == eFloor::THIRD) {
+      downPointerShift();
+      reverseRotate();
+      arrivedMusicPlay();
+    }
+  } else {
+    if (direction == true) {  // 올라가는 중일 때
+      forwardRotate();
+    } else {  // 내려가는 중일 때
+      reverseRotate();
+    }
+    presentFloor = eFloor::SECOND;
+    presentFloorDigitDisplay();
+    delay_(1000);
+  }
+
+  presentRotateCount = 0;
+  presentFloor = eFloor::SECOND;
+  presentFloorDigitDisplay();
 }
+
+/**
+  3층 눌렀을 때
+*/
+// void topFloorStop() {
+//   presentFloorDigitOff();
+
+//   if (presentFloor == eFloor::FIRST) {
+//     upPointerShift();
+//     forwardRotate();
+//     forwardRotate();
+//     arrivedMusicPlay();
+//   } else if (presentFloor == eFloor::SECOND) {
+//     upPointerShift();
+//     forwardRotate();
+//     arrivedMusicPlay();
+//   }
+
+//   presentFloor = eFloor::THIRD;
+//   presentFloorDigitDisplay();
+// }
