@@ -1,7 +1,5 @@
 #include <SPI.h>
 #include <MFRC522.h>
-#include <LiquidCrystal_I2C.h>
-#include <Wire.h>
 
 /**
   전처리기
@@ -37,7 +35,7 @@ eFloor presentFloor = eFloor::FIRST;
 /**
   엘리베이터 관련 상수
 */
-const int EMERGENCY_BUTTON = 2;     //비상정지 스위치 인터럽트 2번핀
+const int EMERGENCY_BUTTON = 2;     //비상 호출 스위치 인터럽트 2번핀
 const int FIRST_FLOOR_BUTTON = 18;  //1층 스위치
 const int SECOND_FLOOR_BUTTON = 3;  //2층 스위치
 const int THIRD_FLOOR_BUTTON = 19;  //3층 스위치
@@ -87,11 +85,6 @@ byte residentCard[4] = { 19, 241, 90, 2 };    //입주민 카드 ID
 MFRC522 mfrc522(SS_PIN, RST_PIN);  // RFID 객체
 
 /**
-  I2C_LCD 객체 생성
-*/
-LiquidCrystal_I2C lcd(0x27, 16, 2);  //LCD 핀
-
-/**
   Step motor 관련 변수
 */
 bool direction = true;
@@ -120,19 +113,13 @@ void setup() {
   pinMode(SECOND_FLOOR_BUTTON, INPUT);
   pinMode(THIRD_FLOOR_BUTTON, INPUT);
 
-  pinMode(BUZZER, OUTPUT);
-
   Serial.begin(9600);
-
-  lcd.init();       // LCD 초기화
-  lcd.backlight();  // 백라이트 켜기
 
   SPI.begin();
   mfrc522.PCD_Init();
   ShowReaderDetails();
   Serial.println("Scan PICC to see UID, type, and data blocks...");
 
-  noTone(BUZZER);
 
   // 인터럽트
   noInterrupts();
@@ -143,7 +130,6 @@ void setup() {
   //attachInterrupt(digitalPinToInterrupt(THIRD_FLOOR_BUTTON), topFloorStop, FALLING);
 }
 
-unsigned long currentMs;
 
 void loop() {
   // if (!mfrc522.PICC_IsNewCardPresent()) return;
@@ -173,12 +159,10 @@ void loop() {
     if (presentFloor == eFloor::SECOND) {
       downPointerShift();
       reverseRotate();
-      arrivedMusicPlay();
     } else if (presentFloor == eFloor::THIRD) {
       downPointerShift();
       reverseRotate();
       reverseRotate();
-      arrivedMusicPlay();
     }
 
     presentFloor = eFloor::FIRST;
@@ -193,11 +177,9 @@ void loop() {
       upPointerShift();
       forwardRotate();
       forwardRotate();
-      arrivedMusicPlay();
     } else if (presentFloor == eFloor::SECOND) {
       upPointerShift();
       forwardRotate();
-      arrivedMusicPlay();
     }
 
     presentFloor = eFloor::THIRD;
@@ -233,21 +215,12 @@ void presentFloorDigitOff() {
   }
 }
 
-// 엘베 도착음
-void arrivedMusicPlay() {
-  tone(BUZZER, c_4);
-  delay_(400);
-  tone(BUZZER, e_4);
-  delay_(400);
-  tone(BUZZER, g_4);
-  delay_(400);
-  noTone(BUZZER);
-}
 
 
 // 위로 향하는 화살표 lcd
 void upPointerShift() {
 }
+
 
 // 아래로 향하는 화살표 lcd
 void downPointerShift() {
@@ -363,6 +336,8 @@ void ShowReaderDetails() {
   }
 }
 
+
+
 void delay_(int delayTime) {
   int count = 0;
 
@@ -373,6 +348,8 @@ void delay_(int delayTime) {
 
   count = 0;
 }
+
+
 
 /**
   비상정지 인터럽트 시 행동
