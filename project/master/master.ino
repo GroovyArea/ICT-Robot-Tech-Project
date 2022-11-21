@@ -290,7 +290,7 @@ void forwardRotate() {
       totalRotateCount--;
       presentRotateCount++;
 
-      if (presentRotateCount == totalRotateCount) {
+      if (presentRotateCount == 4095 * 4) {
         break;
       }
     }
@@ -316,7 +316,7 @@ void reverseRotate() {
       totalRotateCount--;
       presentRotateCount++;
 
-      if (presentRotateCount == totalRotateCount) {
+      if (presentRotateCount == 4095 * 4) {
         break;
       }
     }
