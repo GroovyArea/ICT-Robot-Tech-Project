@@ -1,5 +1,6 @@
 #include <Wire.h>
 #include <LiquidCrystal.h>
+
 #define slave 20
 
 #define c_4 261  // 계이름 도 주파수
@@ -15,6 +16,9 @@ const char FIRST_FLOOR_ARRIVED = 'f';
 const char SECOND_FLOOR_ARRIVED = 's';
 const char THIRD_FLOOR_ARRIVED = 't';
 const char EMERGENCY_STOPPED = 'e';
+const char MANAGER_TAGED = 'm';
+
+bool isRelayToggled = false;  //초기 릴레이 상태
 /**
   통신 데이터 저장 배열
 */
@@ -172,7 +176,6 @@ void setup() {
   pinMode(INTERRUPTED_UP_PIN, INPUT);
   pinMode(INTERRUPTED_DOWN_PIN, INPUT);
   pinMode(INTERRUPTED_SECOND_ARRIVED_PIN, INPUT);
-
 }
 
 
@@ -205,7 +208,7 @@ void LcdDisplay() {
   char recivedNum = rec[0];
 
   switch (recivedNum) {
-    case  FIRST_FLOOR_ARRIVED:
+    case FIRST_FLOOR_ARRIVED:
       LcdClear();
       lcd.setCursor(0, 0);
       lcd.print("FIRST_FLOOR");
@@ -219,25 +222,40 @@ void LcdDisplay() {
       arrivedMusicPlay();
       rec[0] = '.';
       break;
-    case  THIRD_FLOOR_ARRIVED:
+    case THIRD_FLOOR_ARRIVED:
       LcdClear();
       lcd.setCursor(0, 0);
       lcd.print("THIRD_FLOOR     ");
       arrivedMusicPlay();
       rec[0] = '.';
       break;
-    case  UP:
-      goUp(); //올라가는함수
+    case UP:
+      goUp();  //올라가는함수
       break;
-    case  DOWN:
-      goDown(); //내려가는함수
+    case DOWN:
+      goDown();  //내려가는함수
       break;
     case EMERGENCY_STOPPED:
       emergencyStop();
       break;
+    case MANAGER_TAGED:
+      managerLock();
+      break;
   }
 }
 
+void managerLock() {
+  if (isRelayToggled == false) {
+    Serial.print("hi");
+    LcdClear();
+    lcd.setCursor(0, 0);
+    lcd.print("Working");
+  } else {
+    LcdClear();
+  }
+
+  isRelayToggled = !isRelayToggled;
+}
 
 void emergencyStop() {
   lcd.setCursor(0, 0);

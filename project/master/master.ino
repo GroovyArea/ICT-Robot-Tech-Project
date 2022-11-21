@@ -1,6 +1,8 @@
 #include <SPI.h>
 #include <MFRC522.h>
 #include <Wire.h>
+#include <string.h>
+#include <stdio.h>
 
 /**
   전처리기
@@ -10,14 +12,14 @@
 #define IN3 26
 #define IN4 28
 
-#define SS_PIN 5  //RFID 핀
-#define RST_PIN 4
+#define SS_PIN 53  //RFID 핀
+#define RST_PIN 49
 
 #define c_4 261  // 계이름 도 주파수
 #define e_4 329
 #define g_4 392
 
-#define SLAVE 20  // 슬레이브
+#define SLAVE 20  // 통신용 슬레이브
 
 
 /**
@@ -63,6 +65,7 @@ const char FIRST_FLOOR_ARRIVED = 'f';
 const char SECOND_FLOOR_ARRIVED = 's';
 const char THIRD_FLOOR_ARRIVED = 't';
 const char EMERGENCY_STOPPED = 'e';
+const char MANAGER_TAGED = 'm';
 
 
 /**
@@ -94,14 +97,8 @@ int segmentNumbers[10][7] = {
 /**
   RFID 관련
 */
-byte nuidPICC[4];                             //카드 ID를 비교하기 위한 배열
-byte managerCard[4] = { 115, 202, 136, 12 };  //관리자 카드 ID
-byte residentCard[4] = { 19, 241, 90, 2 };    //입주민 카드 ID
-
-
-/**
-  RFID 객체 생성
-*/
+byte nuidPICC[4];                           //카드 ID를 비교하기 위한 배열
+const String MANAGER_CARD = "83 4F 6D 02";  // 관리자 카드 번호
 MFRC522 mfrc522(SS_PIN, RST_PIN);  // RFID 객체
 
 
@@ -113,8 +110,16 @@ int steps = 0;
 unsigned long lastTime;
 unsigned long currentMillis;
 long time;
-
 int presentRotateCount = 0;  // 현재까지 스텝 돈 수
+
+
+/**
+  릴레이 관련 변수
+*/
+const int RELAY_PIN = 13;
+bool isTaged = true;
+
+
 
 void setup() {
   for (int i = 0; i < 7; i++) {
@@ -129,10 +134,11 @@ void setup() {
   pinMode(IN4, OUTPUT);
 
   pinMode(FIRST_FLOOR_BUTTON, INPUT);
-  //pinMode(SECOND_FLOOR_BUTTON, INPUT);
   pinMode(THIRD_FLOOR_BUTTON, INPUT);
 
   pinMode(INTERRUPTED_UP_PIN, OUTPUT);
+
+  pinMode(RELAY_PIN, OUTPUT);
 
   Serial.begin(9600);
 
@@ -153,29 +159,11 @@ void setup() {
 }
 
 void loop() {
-  // if (!mfrc522.PICC_IsNewCardPresent()) return;
-  // if (!mfrc522.PICC_ReadCardSerial()) return;
-  // mfrc522.PICC_DumpToSerial(&(mfrc522.uid));
-
-  // String tagedCard = "";
-
-  // // 새 카드 접촉 시
-  // if (mfrc522.uid.uidByte[0] != nuidPICC[0] || mfrc522.uid.uidByte[1] != nuidPICC[1] || mfrc522.uid.uidByte[2] != nuidPICC[2] || mfrc522.uid.uidByte[3] != nuidPICC[3]) {
-  //   for (byte i = 0; i < 4; i++) {
-  //     nuidPICC[i] = mfrc522.uid.uidByte[i];  // 배열에 카드 번호 저장
-  //   }
-
-  //   for( byte i =0; i<mfrc522.uid.size; i++) {
-  //     tagedCard.concat(String(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " "));
-  //     tagedCard.concat(String(mfrc522.uid.uidByte[i], DEC));
-  //   }
-  // }
-
   int firstBtn = digitalRead(FIRST_FLOOR_BUTTON);
   int thirdBtn = digitalRead(THIRD_FLOOR_BUTTON);
   int emergencyBtn = digitalRead(EMERGENCY_BUTTON);
 
-  /* 비상 호출 눌렀을 경우*/
+  /* 비상 호출 눌렀을 경우 */
   if (emergencyBtn == HIGH) {
     transferData(EMERGENCY_STOPPED);
   }
@@ -217,8 +205,34 @@ void loop() {
     presentFloorDigitDisplay();
     presentRotateCount = 0;
   }
+
+  /* 태그 카드 관련 */
+  if (!mfrc522.PICC_IsNewCardPresent()) return;
+  if (!mfrc522.PICC_ReadCardSerial()) return;
+  mfrc522.PICC_DumpToSerial(&(mfrc522.uid));
+
+  String tagedCard = "";
+
+  for (byte i = 0; i < mfrc522.uid.size; i++) {
+    tagedCard.concat(String(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " "));
+    tagedCard.concat(String(mfrc522.uid.uidByte[i], HEX));
+  }
+
+  tagedCard.toUpperCase();
+
+  if (tagedCard.substring(1) == MANAGER_CARD) {
+    relayToggle();
+    transferData(MANAGER_TAGED);
+  }
 }
 
+
+// 릴레이 토글 함수
+void relayToggle() {
+  digitalWrite(RELAY_PIN, isTaged);
+  presentFloorDigitOff();
+  isTaged = !isTaged;
+}
 
 // 층별 Segment display on
 void presentFloorDigitDisplay() {
@@ -238,16 +252,6 @@ void presentFloorDigitDisplay() {
 }
 
 
-
-// 통신 함수
-void transferData(char data) {
-  Wire.beginTransmission(SLAVE);  // data 전송 시작
-  Wire.write(data);               // buffer에 data 저장
-  Wire.endTransmission();         // buffer에 저장된 data 전송
-}
-
-
-
 // 층별 Segment display off
 void presentFloorDigitOff() {
   for (int i = 0; i < 7; i++) {
@@ -258,12 +262,21 @@ void presentFloorDigitOff() {
 }
 
 
+
+// 통신 함수
+void transferData(char data) {
+  Wire.beginTransmission(SLAVE);  // data 전송 시작
+  Wire.write(data);               // buffer에 data 저장
+  Wire.endTransmission();         // buffer에 저장된 data 전송
+}
+
+
 // 정방향 회전
 void forwardRotate() {
   presentFloorDigitOff();
   direction = true;
 
-  int totalRotateCount = 4095 * 1;
+  int totalRotateCount = 4095 * 4;
 
   while (totalRotateCount > 0) {
     currentMillis = micros();
@@ -289,7 +302,7 @@ void reverseRotate() {
   presentFloorDigitOff();
   direction = false;
 
-  int totalRotateCount = 4095 * 1;
+  int totalRotateCount = 4095 * 4;
 
   while (totalRotateCount > 0) {
     currentMillis = micros();
@@ -310,6 +323,7 @@ void reverseRotate() {
   }
 }
 
+// 스텝 모터 케이스 별 동작
 void stepperAct() {
   switch (steps) {
     case 0: runStep(LOW, LOW, LOW, HIGH); break;
@@ -325,6 +339,7 @@ void stepperAct() {
   setDirection();
 }
 
+// 스텝 모터 동작
 void runStep(int step1, int step2, int step3, int step4) {
   digitalWrite(IN1, step1);
   digitalWrite(IN2, step2);
@@ -332,6 +347,7 @@ void runStep(int step1, int step2, int step3, int step4) {
   digitalWrite(IN4, step4);
 }
 
+// 스텝 모터 방향 바꾸기
 void setDirection() {
   if (direction == true) {
     steps++;
@@ -347,8 +363,7 @@ void setDirection() {
   }
 }
 
-
-
+// RFID
 void ShowReaderDetails() {
   byte v = mfrc522.PCD_ReadRegister(mfrc522.VersionReg);
 
@@ -369,7 +384,7 @@ void ShowReaderDetails() {
 }
 
 
-
+// delayMicroseconds를 이용한 delay
 void delay_(int delayTime) {
   int count = 0;
 
@@ -383,24 +398,16 @@ void delay_(int delayTime) {
 
 
 
-/**
-  비상정지 인터럽트 시 행동
-*/
-void emergencyCommunicate() {
-  // 경비실로 연결, 시리얼 모니터로 계속 받고 LCD에 내용 디스플레이
-  // 비상정지 버튼이나, 특정 문자 입력 시 종료
-}
 
 
 /**
-  2층 눌렀을 때
+  2층 눌렀을 때 인터럽트 서비스 루틴
 */
 void middleFloorStop() {
   presentFloorDigitOff();
   if (presentRotateCount == 0) {
     if (presentFloor == eFloor::FIRST) {
       digitalWrite(INTERRUPTED_UP_PIN, HIGH);
-      Serial.print(digitalRead(INTERRUPTED_UP_PIN));
       forwardRotate();
       digitalWrite(INTERRUPTED_SECOND_ARRIVED_PIN, HIGH);
     } else if (presentFloor == eFloor::THIRD) {
@@ -411,7 +418,7 @@ void middleFloorStop() {
 
     digitalWrite(INTERRUPTED_UP_PIN, LOW);
     digitalWrite(INTERRUPTED_DOWN_PIN, LOW);
-    presentFloor = eFloor::SECOND;
+    presentFloor = eFloor::SECOND; // 현재 층을 2층으로 변경
     presentFloorDigitDisplay();
   } else {
     if (direction == true) {
@@ -426,7 +433,7 @@ void middleFloorStop() {
 
     digitalWrite(INTERRUPTED_UP_PIN, LOW);
     digitalWrite(INTERRUPTED_DOWN_PIN, LOW);
-    presentFloor = eFloor::SECOND;
+    presentFloor = eFloor::SECOND; // 현재 층을 2층으로 변경
     presentFloorDigitDisplay();
     delay_(1000);
   }
