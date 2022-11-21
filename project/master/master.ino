@@ -263,7 +263,7 @@ void presentFloorDigitOff() {
 
 
 
-// 통신 함수
+// I2C 통신 함수
 void transferData(char data) {
   Wire.beginTransmission(SLAVE);  // data 전송 시작
   Wire.write(data);               // buffer에 data 저장
@@ -290,7 +290,7 @@ void forwardRotate() {
       totalRotateCount--;
       presentRotateCount++;
 
-      if (presentRotateCount == 4095) {
+      if (presentRotateCount == totalRotateCount) {
         break;
       }
     }
@@ -316,7 +316,7 @@ void reverseRotate() {
       totalRotateCount--;
       presentRotateCount++;
 
-      if (presentRotateCount == 4095) {
+      if (presentRotateCount == totalRotateCount) {
         break;
       }
     }

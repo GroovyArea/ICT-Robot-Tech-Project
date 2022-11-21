@@ -240,16 +240,17 @@ void LcdDisplay() {
       break;
     case MANAGER_TAGED:
       managerLock();
+      rec[0] = '.';
       break;
   }
 }
-
 void managerLock() {
   if (isRelayToggled == false) {
-    Serial.print("hi");
     LcdClear();
     lcd.setCursor(0, 0);
-    lcd.print("Working");
+    lcd.print("Under");
+    lcd.setCursor(0,1);
+    lcd.print("Maintenance");
   } else {
     LcdClear();
   }
