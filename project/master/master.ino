@@ -39,9 +39,9 @@ eFloor presentFloor = eFloor::FIRST;
 /**
   엘리베이터 관련 상수
 */
-const int EMERGENCY_BUTTON = 2;     //비상 호출 스위치 인터럽트 2번핀
+const int EMERGENCY_BUTTON = 2;     //비상 호출 스위치
 const int FIRST_FLOOR_BUTTON = 18;  //1층 스위치
-const int SECOND_FLOOR_BUTTON = 3;  //2층 스위치
+const int SECOND_FLOOR_BUTTON = 3;  //2층 스위치 인터럽트
 const int THIRD_FLOOR_BUTTON = 19;  //3층 스위치
 
 const int ONE_FLOOR = 5;
@@ -405,6 +405,7 @@ void delay_(int delayTime) {
 */
 void middleFloorStop() {
   presentFloorDigitOff();
+  
   if (presentRotateCount == 0) {
     if (presentFloor == eFloor::FIRST) {
       digitalWrite(INTERRUPTED_UP_PIN, HIGH);
