@@ -16,12 +16,12 @@
 
 ## 작품 사진
 <br>
-<img src = "https://user-images.githubusercontent.com/89288109/205474964-8418323b-8f9f-4aec-94db-acf7054738d9.png" width="600" height = "200">
+<img src = "https://user-images.githubusercontent.com/89288109/205474964-8418323b-8f9f-4aec-94db-acf7054738d9.png" width="600" height = "500">
 
 - 정면
 
 <br>
-<img src = "https://user-images.githubusercontent.com/89288109/205475036-59a81acf-dc3a-4c10-ada1-73bff477e16b.png" width="600" height = "200">
+<img src = "https://user-images.githubusercontent.com/89288109/205475036-59a81acf-dc3a-4c10-ada1-73bff477e16b.png" width="600" height = "600">
 
 - 윗면
 
